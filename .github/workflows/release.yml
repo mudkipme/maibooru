@@ -1,11 +1,22 @@
 name: Release
 
 # A tag v<version> publishes the release of mygo.json's version; each push
-# to main replaces the "nightly" pre-release with a build of it.
+# to main that changes what goes into the app replaces the "nightly"
+# pre-release with a build of it. GitHub ignores the paths for tags.
 on:
   push:
     branches: [main]
     tags: ["v*"]
+    paths:
+      - "**.go"
+      - "!**_test.go"
+      - "go.mod"
+      - "go.sum"
+      - "mygo.json"
+      - "internal/**/swift/**"
+      - "resources/**"
+      - "scripts/**"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
