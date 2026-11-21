@@ -83,6 +83,46 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' mygo.json > mygo.json.new
           mv mygo.json.new mygo.json
 
+      - name: Import the Developer ID certificate and the notary credentials
+        if: matrix.name == 'macOS'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE" ]; then
+            echo "::warning::No MACOS_CERTIFICATE secret: the macOS apps are signed ad hoc and not notarized"
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -base64 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain
+
+          identity=$(security find-identity -v -p codesigning "$keychain" \
+            | grep -o '"Developer ID Application: .*"' | head -1 | tr -d '"')
+          if [ -z "$identity" ]; then
+            echo "::error::MACOS_CERTIFICATE holds no Developer ID Application identity"
+            exit 1
+          fi
+          team=${identity##*(}
+          team=${team%)}
+          xcrun notarytool store-credentials notary --keychain "$keychain" \
+            --apple-id "$APPLE_ID" --team-id "$team" --password "$APPLE_APP_PASSWORD"
+
+          jq --arg id "$identity" --arg kc "$keychain" \
+            '.macos = (.macos // {}) + {signingIdentity: $id, notarize: {keychainProfile: "notary", keychain: $kc}}' \
+            mygo.json > mygo.json.new
+          mv mygo.json.new mygo.json
+
       - name: Install NSIS, for the Windows installers
         if: matrix.name == 'Windows'
         run: sudo apt-get update && sudo apt-get install -y nsis
@@ -166,4 +206,4 @@ jobs:
           gh release delete nightly --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
           gh release create nightly dist/* --repo "$GITHUB_REPOSITORY" \
             --prerelease --target "$GITHUB_SHA" --title "Nightly $VERSION" \
-            --notes "Built from ${GITHUB_SHA::7} on main. The apps are not signed: on macOS, open them with Control-click → Open; on Windows, choose More info → Run anyway."
+            --notes "Built from ${GITHUB_SHA::7} on main. The Windows apps are not signed: choose More info → Run anyway."
