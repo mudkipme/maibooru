@@ -19,16 +19,12 @@ import (
 	"github.com/mudkipme/maibooru/internal/settings"
 )
 
-// version is set by the build.
-var version = "0.1.0"
-
 // mediaPageMade, when set, hears of the viewer's web view as it is made,
 // for end-to-end tests.
 var mediaPageMade func(*mygo.WebView)
 
 func main() {
 	mygo.App.SetName("Maibooru")
-	mygo.App.SetVersion(version)
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
 	}
@@ -75,7 +71,7 @@ func main() {
 		Cache:    content,
 		Desktop:  desktop{win: window},
 		Post:     post,
-		Version:  version,
+		Version:  mygo.App.Version(), // mygo.json's, which mygo build links in
 		MediaPage: func() (gui.MediaPage, error) {
 			w := window()
 			if w == nil || !mygo.WebViewAvailable() {

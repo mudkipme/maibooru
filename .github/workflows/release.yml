@@ -1,0 +1,169 @@
+name: Release
+
+# A tag v<version> publishes the release of mygo.json's version; each push
+# to main replaces the "nightly" pre-release with a build of it.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
+env:
+  APPIMAGETOOL_URL: https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+  APPIMAGETOOL_SHA256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+  RUNTIME_URL: https://github.com/AppImage/type2-runtime/releases/download/20251108
+  RUNTIME_X86_64_SHA256: 2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
+  RUNTIME_AARCH64_SHA256: 00cbdfcf917cc6c0ff6d3347d59e0ca1f7f45a6df1a428a0d6d8a78664d87444
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        run: |
+          base=$(jq -r .version mygo.json)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version=${GITHUB_REF_NAME#v}
+            if [ "$version" != "$base" ]; then
+              echo "::error::The tag $GITHUB_REF_NAME is not mygo.json's version, $base"
+              exit 1
+            fi
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            version="$base-dev.$GITHUB_RUN_NUMBER"
+            echo "tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  build:
+    needs: [version, test]
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS, os: macos-latest, platform: "darwin/arm64,darwin/amd64" }
+          - { name: Windows, os: ubuntu-latest, platform: "windows/amd64,windows/arm64" }
+          - { name: Linux, os: ubuntu-latest, platform: "linux/amd64,linux/arm64" }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Stamp the version
+        run: |
+          jq --arg v "$VERSION" '.version = $v' mygo.json > mygo.json.new
+          mv mygo.json.new mygo.json
+
+      - name: Install NSIS, for the Windows installers
+        if: matrix.name == 'Windows'
+        run: sudo apt-get update && sudo apt-get install -y nsis
+
+      - name: Build
+        run: go tool mygo build -platform "${{ matrix.platform }}" -o build
+
+      - name: Collect the macOS disk images
+        if: matrix.name == 'macOS'
+        run: |
+          mkdir dist
+          cp build/darwin-*/*.dmg dist/
+
+      - name: Collect the Windows installers and portable apps
+        if: matrix.name == 'Windows'
+        run: |
+          mkdir dist
+          for arch in amd64 arm64; do
+            dir=build/windows-$arch
+            cp "$dir"/*-setup-*.exe dist/
+            (cd "$dir" && zip -r "$GITHUB_WORKSPACE/dist/Maibooru-$VERSION-windows-$arch.zip" . -x '*-setup-*.exe')
+          done
+
+      - name: Make the AppImages
+        if: matrix.name == 'Linux'
+        run: |
+          tools=$RUNNER_TEMP/appimage
+          mkdir -p "$tools"
+          curl -fsSL -o "$tools/appimagetool" "$APPIMAGETOOL_URL"
+          curl -fsSL -o "$tools/runtime-x86_64" "$RUNTIME_URL/runtime-x86_64"
+          curl -fsSL -o "$tools/runtime-aarch64" "$RUNTIME_URL/runtime-aarch64"
+          sha256sum -c <<EOF
+          $APPIMAGETOOL_SHA256  $tools/appimagetool
+          $RUNTIME_X86_64_SHA256  $tools/runtime-x86_64
+          $RUNTIME_AARCH64_SHA256  $tools/runtime-aarch64
+          EOF
+          chmod +x "$tools/appimagetool"
+          mkdir dist
+          for pair in amd64:x86_64 arm64:aarch64; do
+            goarch=${pair%:*} arch=${pair#*:}
+            APPIMAGETOOL="$tools/appimagetool" APPIMAGE_RUNTIME="$tools/runtime-$arch" \
+              scripts/appimage.sh "build/linux-$goarch" "dist/Maibooru-$VERSION-$arch.AppImage"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+
+      - name: Publish the release
+        if: needs.version.outputs.prerelease == 'false'
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --title "Maibooru $VERSION" --generate-notes
+          fi
+
+      - name: Replace the nightly pre-release
+        if: needs.version.outputs.prerelease == 'true'
+        run: |
+          gh release delete nightly --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
+          gh release create nightly dist/* --repo "$GITHUB_REPOSITORY" \
+            --prerelease --target "$GITHUB_SHA" --title "Nightly $VERSION" \
+            --notes "Built from ${GITHUB_SHA::7} on main. The apps are not signed: on macOS, open them with Control-click → Open; on Windows, choose More info → Run anyway."

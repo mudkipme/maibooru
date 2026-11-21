@@ -49,6 +49,16 @@ drag them back out into other apps.
 
 ## Install
 
+[Releases](https://github.com/mudkipme/maibooru/releases) have the app for
+Linux (AppImage), macOS (disk image) and Windows (installer, or a zip to
+run as it is), each for x86-64 and ARM64. The `nightly` pre-release is
+built from every push to `main`. The apps are not signed yet: on macOS,
+open the app with Control-click → Open the first time; on Windows, choose
+More info → Run anyway.
+
+Tagging `v<version>`, the version in `mygo.json`, publishes its release
+(`.github/workflows/release.yml`).
+
 `go tool mygo build` packages the app for the machine it runs on into
 `build/`: an app bundle and disk image on macOS, an installer on Windows,
 and `.deb`, `.rpm`, a tarball with `install.sh` and a PKGBUILD on Linux.
@@ -114,3 +124,7 @@ viewer's web view shows, every second.
 | `internal/cache` | the posts' content, downloaded once and kept on disk |
 | `internal/gui` | the window: a view for each page, built from the app's state every frame |
 | `main.go` | the window, menus, dialogs and what the system opens the app with |
+
+## License
+
+[MIT](LICENSE).
