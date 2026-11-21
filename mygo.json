@@ -1,0 +1,19 @@
+{
+  "name": "Maibooru",
+  "identifier": "me.mudkip.maibooru",
+  "version": "0.1.0",
+  "out": "build",
+  "urlSchemes": ["maibooru"],
+  "fileAssociations": [
+    { "ext": ["jpg", "jpeg"], "name": "JPEG Picture", "mimeType": "image/jpeg", "role": "Viewer" },
+    { "ext": ["png"], "name": "PNG Picture", "mimeType": "image/png", "role": "Viewer" },
+    { "ext": ["gif"], "name": "GIF Animation", "mimeType": "image/gif", "role": "Viewer" },
+    { "ext": ["webp"], "name": "WebP Picture", "mimeType": "image/webp", "role": "Viewer" },
+    { "ext": ["avif"], "name": "AVIF Picture", "mimeType": "image/avif", "role": "Viewer" },
+    { "ext": ["jxl"], "name": "JPEG XL Picture", "mimeType": "image/jxl", "role": "Viewer" },
+    { "ext": ["mp4", "m4v"], "name": "MPEG-4 Video", "mimeType": "video/mp4", "role": "Viewer" },
+    { "ext": ["mov"], "name": "QuickTime Video", "mimeType": "video/quicktime", "role": "Viewer" },
+    { "ext": ["webm"], "name": "WebM Video", "mimeType": "video/webm", "role": "Viewer" }
+  ],
+  "linux": { "categories": ["Graphics", "Viewer"] }
+}
