@@ -2,6 +2,8 @@
 
 A native desktop app for managing your personal media library on an [Oxibooru](https://github.com/liamw1/oxibooru) or [Szurubooru](https://github.com/rr-/szurubooru) server. Available for macOS, Windows, and Linux.
 
+![Maibooru](screenshot.webp)
+
 ## Features
 
 - **Browse & Search**: Scroll through your library in a responsive grid with tag autocomplete, full search syntax, sorting, filters, and saved searches.
