@@ -1,8 +1,8 @@
 # Maibooru
 
 A desktop app for keeping your media library on an
-[Oxibooru](https://github.com/liamw1/oxibooru) server (or a Szurubooru server
-it is compatible with). It is written in Go with
+[Oxibooru](https://github.com/liamw1/oxibooru) or a
+[Szurubooru](https://github.com/rr-/szurubooru) server. It is written in Go with
 [MyGo](https://github.com/egoist/mygo)'s native UI: one small binary for
 macOS, Windows and Linux, drawn on the GPU, with no webview.
 
@@ -89,7 +89,8 @@ go test ./...
 ```
 
 `MAIBOORU_SHOTS`, when set, receives a picture of each screen the app test
-goes through. `.github/workflows/ci.yml` runs the tests and packages the
+goes through. The same tests run against a Szurubooru server, whose
+resources carry numbered versions and whose posts have no descriptions. `.github/workflows/ci.yml` runs the tests and packages the
 app on Linux, macOS and Windows.
 
 The real window is driven from outside through MyGo's automation plugin,

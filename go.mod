@@ -2,7 +2,7 @@ module github.com/mudkipme/maibooru
 
 go 1.27.4
 
-require github.com/egoist/mygo v0.10.1-0.20261120125212-9976b9bc0e9b
+require github.com/egoist/mygo v0.10.0
 
 require (
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect

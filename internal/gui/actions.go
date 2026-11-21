@@ -308,7 +308,7 @@ func (a *App) deletePosts(posts []*oxibooru.Post) {
 	}
 	type target struct {
 		id      int64
-		version string
+		version oxibooru.Version
 	}
 	var targets []target
 	for _, p := range posts {

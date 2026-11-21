@@ -85,7 +85,7 @@ func (c *Client) FeaturePost(ctx context.Context, postID int64) (*Post, error) {
 // PostFields is what creating or updating a post sets: only the fields that
 // are not nil, and Version for an update.
 type PostFields struct {
-	Version     string    `json:"version,omitzero"`
+	Version     Version   `json:"version,omitzero"`
 	Tags        *[]string `json:"tags,omitzero"`
 	Safety      *Safety   `json:"safety,omitzero"`
 	Source      *string   `json:"source,omitzero"`
@@ -115,12 +115,12 @@ func (c *Client) UpdatePost(ctx context.Context, postID int64, f PostFields) (*P
 
 // DiscardThumbnail goes back to the thumbnail the server makes of a post's
 // content, from a custom one.
-func (c *Client) DiscardThumbnail(ctx context.Context, postID int64, version string) (*Post, error) {
+func (c *Client) DiscardThumbnail(ctx context.Context, postID int64, version Version) (*Post, error) {
 	return send[*Post](ctx, c, http.MethodPut, "post/"+id(postID), nil, map[string]any{"version": version, "thumbnailToken": nil})
 }
 
 // DeletePost deletes a post.
-func (c *Client) DeletePost(ctx context.Context, postID int64, version string) error {
+func (c *Client) DeletePost(ctx context.Context, postID int64, version Version) error {
 	return c.do(ctx, http.MethodDelete, "post/"+id(postID), nil, versioned{version}, nil)
 }
 
@@ -170,7 +170,7 @@ func (c *Client) TagCategories(ctx context.Context) ([]TagCategory, error) {
 
 // CategoryFields is what creating or updating a category sets.
 type CategoryFields struct {
-	Version string  `json:"version,omitzero"`
+	Version Version `json:"version,omitzero"`
 	Name    *string `json:"name,omitzero"`
 	Color   *string `json:"color,omitzero"`
 	Order   *int    `json:"order,omitzero"`
@@ -193,7 +193,7 @@ func (c *Client) SetDefaultTagCategory(ctx context.Context, name string) (*TagCa
 
 // DeleteTagCategory deletes a tag category, whose tags go to the default
 // one.
-func (c *Client) DeleteTagCategory(ctx context.Context, name, version string) error {
+func (c *Client) DeleteTagCategory(ctx context.Context, name string, version Version) error {
 	return c.do(ctx, http.MethodDelete, "tag-category/"+url.PathEscape(name), nil, versioned{version}, nil)
 }
 
@@ -217,7 +217,7 @@ func (c *Client) TagSiblings(ctx context.Context, name string) ([]TagSibling, er
 
 // TagFields is what creating or updating a tag sets.
 type TagFields struct {
-	Version      string    `json:"version,omitzero"`
+	Version      Version   `json:"version,omitzero"`
 	Names        *[]string `json:"names,omitzero"`
 	Category     *string   `json:"category,omitzero"`
 	Description  *string   `json:"description,omitzero"`
@@ -236,13 +236,13 @@ func (c *Client) UpdateTag(ctx context.Context, name string, f TagFields) (*Tag,
 }
 
 // DeleteTag deletes a tag, which no post may use.
-func (c *Client) DeleteTag(ctx context.Context, name, version string) error {
+func (c *Client) DeleteTag(ctx context.Context, name string, version Version) error {
 	return c.do(ctx, http.MethodDelete, "tag/"+url.PathEscape(name), nil, versioned{version}, nil)
 }
 
 // MergeTags merges the tag remove into mergeTo.
 func (c *Client) MergeTags(ctx context.Context, remove, mergeTo *Tag) (*Tag, error) {
-	body := map[string]string{
+	body := map[string]any{
 		"remove": remove.Name(), "removeVersion": remove.Version,
 		"mergeTo": mergeTo.Name(), "mergeToVersion": mergeTo.Version,
 	}
@@ -275,7 +275,7 @@ func (c *Client) SetDefaultPoolCategory(ctx context.Context, name string) (*Pool
 }
 
 // DeletePoolCategory deletes a pool category.
-func (c *Client) DeletePoolCategory(ctx context.Context, name, version string) error {
+func (c *Client) DeletePoolCategory(ctx context.Context, name string, version Version) error {
 	return c.do(ctx, http.MethodDelete, "pool-category/"+url.PathEscape(name), nil, versioned{version}, nil)
 }
 
@@ -293,7 +293,7 @@ func (c *Client) Pool(ctx context.Context, poolID int64) (*Pool, error) {
 
 // PoolFields is what creating or updating a pool sets.
 type PoolFields struct {
-	Version     string    `json:"version,omitzero"`
+	Version     Version   `json:"version,omitzero"`
 	Names       *[]string `json:"names,omitzero"`
 	Category    *string   `json:"category,omitzero"`
 	Description *string   `json:"description,omitzero"`
@@ -311,7 +311,7 @@ func (c *Client) UpdatePool(ctx context.Context, poolID int64, f PoolFields) (*P
 }
 
 // DeletePool deletes a pool, keeping its posts.
-func (c *Client) DeletePool(ctx context.Context, poolID int64, version string) error {
+func (c *Client) DeletePool(ctx context.Context, poolID int64, version Version) error {
 	return c.do(ctx, http.MethodDelete, "pool/"+id(poolID), nil, versioned{version}, nil)
 }
 
@@ -338,7 +338,7 @@ func (c *Client) CreateComment(ctx context.Context, postID int64, text string) (
 
 // UpdateComment changes a comment's text.
 func (c *Client) UpdateComment(ctx context.Context, cm *Comment, text string) (*Comment, error) {
-	return send[*Comment](ctx, c, http.MethodPut, "comment/"+id(cm.ID), nil, map[string]string{"version": cm.Version, "text": text})
+	return send[*Comment](ctx, c, http.MethodPut, "comment/"+id(cm.ID), nil, map[string]any{"version": cm.Version, "text": text})
 }
 
 // RateComment sets the user's score of a comment: -1, 0 or 1.
@@ -369,7 +369,7 @@ func (c *Client) User(ctx context.Context, name string, bumpLogin bool) (*User, 
 
 // UserFields is what creating or updating a user sets.
 type UserFields struct {
-	Version     string  `json:"version,omitzero"`
+	Version     Version `json:"version,omitzero"`
 	Name        *string `json:"name,omitzero"`
 	Password    *string `json:"password,omitzero"`
 	Email       *string `json:"email,omitzero"`
@@ -391,7 +391,7 @@ func (c *Client) UpdateUser(ctx context.Context, name string, f UserFields) (*Us
 }
 
 // DeleteUser deletes a user.
-func (c *Client) DeleteUser(ctx context.Context, name, version string) error {
+func (c *Client) DeleteUser(ctx context.Context, name string, version Version) error {
 	return c.do(ctx, http.MethodDelete, "user/"+url.PathEscape(name), nil, versioned{version}, nil)
 }
 
@@ -405,7 +405,7 @@ func (c *Client) UserTokens(ctx context.Context, user string) ([]UserToken, erro
 
 // TokenFields is what creating or updating a token sets.
 type TokenFields struct {
-	Version        string     `json:"version,omitzero"`
+	Version        Version    `json:"version,omitzero"`
 	Enabled        *bool      `json:"enabled,omitzero"`
 	Note           *string    `json:"note,omitzero"`
 	ExpirationTime *time.Time `json:"expirationTime,omitzero"`
@@ -471,6 +471,16 @@ func (cfg *Config) RequiredRank(privilege string) (rank Rank, ok bool) {
 		return "", false
 	}
 	return Ranks[best], true
+}
+
+// Szurubooru reports whether the server is Szurubooru rather than
+// Oxibooru, whose privileges it names in its own style ("posts:edit:tags").
+// Szurubooru's posts have no descriptions, and its versions are numbers.
+func (cfg *Config) Szurubooru() bool {
+	for name := range cfg.Privileges {
+		return strings.Contains(name, ":")
+	}
+	return false
 }
 
 // Can reports whether a user of a rank has a privilege. Privileges the

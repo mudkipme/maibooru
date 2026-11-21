@@ -3,6 +3,9 @@ package oxibooru
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"fmt"
+	"slices"
+	"strconv"
 	"time"
 )
 
@@ -61,6 +64,39 @@ func (r Rank) Level() int {
 	return -1
 }
 
+// Version is a resource's version, which changes to it send back as the
+// server gave it: a time on Oxibooru, a number on Szurubooru.
+type Version string
+
+func (v *Version) UnmarshalJSON(b []byte) error {
+	switch {
+	case string(b) == "null":
+		*v = ""
+	case len(b) > 0 && b[0] == '"':
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		*v = Version(s)
+	default:
+		if _, err := strconv.ParseFloat(string(b), 64); err != nil {
+			return fmt.Errorf("version %s is neither a string nor a number", b)
+		}
+		*v = Version(b)
+	}
+	return nil
+}
+
+func (v Version) MarshalJSON() ([]byte, error) {
+	if v == "" {
+		return []byte("null"), nil
+	}
+	if _, err := strconv.ParseInt(string(v), 10, 64); err == nil {
+		return []byte(v), nil
+	}
+	return json.Marshal(string(v))
+}
+
 // Private is a value the server hides from some users, sending false.
 type Private[T any] struct {
 	Value  T
@@ -94,7 +130,7 @@ type MicroUser struct {
 
 // User is an account of the server.
 type User struct {
-	Version           string           `json:"version"`
+	Version           Version          `json:"version"`
 	Name              string           `json:"name"`
 	Email             Private[*string] `json:"email"`
 	Rank              Rank             `json:"rank"`
@@ -117,7 +153,7 @@ type UserToken struct {
 	Note           string     `json:"note"`
 	Enabled        bool       `json:"enabled"`
 	ExpirationTime *time.Time `json:"expirationTime"`
-	Version        string     `json:"version"`
+	Version        Version    `json:"version"`
 	CreationTime   time.Time  `json:"creationTime"`
 	LastEditTime   time.Time  `json:"lastEditTime"`
 	LastUsageTime  time.Time  `json:"lastUsageTime"`
@@ -125,12 +161,12 @@ type UserToken struct {
 
 // TagCategory groups tags, as characters or artists.
 type TagCategory struct {
-	Version string `json:"version"`
-	Name    string `json:"name"`
-	Color   string `json:"color"`
-	Usages  int    `json:"usages"`
-	Order   int    `json:"order"`
-	Default bool   `json:"default"`
+	Version Version `json:"version"`
+	Name    string  `json:"name"`
+	Color   string  `json:"color"`
+	Usages  int     `json:"usages"`
+	Order   int     `json:"order"`
+	Default bool    `json:"default"`
 }
 
 // MicroTag is a tag, as posts refer to it.
@@ -150,7 +186,7 @@ func (t MicroTag) Name() string {
 
 // Tag is a tag of posts.
 type Tag struct {
-	Version      string     `json:"version"`
+	Version      Version    `json:"version"`
 	Names        []string   `json:"names"`
 	Category     string     `json:"category"`
 	Implications []MicroTag `json:"implications"`
@@ -198,7 +234,7 @@ type Note struct {
 
 // Post is a file with its metadata.
 type Post struct {
-	Version            string      `json:"version"`
+	Version            Version     `json:"version"`
 	ID                 int64       `json:"id"`
 	CreationTime       time.Time   `json:"creationTime"`
 	LastEditTime       time.Time   `json:"lastEditTime"`
@@ -237,12 +273,7 @@ type Post struct {
 
 // HasFlag reports whether the post has a flag.
 func (p *Post) HasFlag(flag string) bool {
-	for _, f := range p.Flags {
-		if f == flag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.Flags, flag)
 }
 
 // TagNames returns the first names of the post's tags.
@@ -265,11 +296,11 @@ func (p *Post) RelationIDs() []int64 {
 
 // PoolCategory groups pools.
 type PoolCategory struct {
-	Version string `json:"version"`
-	Name    string `json:"name"`
-	Color   string `json:"color"`
-	Usages  int    `json:"usages"`
-	Default bool   `json:"default"`
+	Version Version `json:"version"`
+	Name    string  `json:"name"`
+	Color   string  `json:"color"`
+	Usages  int     `json:"usages"`
+	Default bool    `json:"default"`
 }
 
 // MicroPool is a pool, as posts refer to it.
@@ -291,7 +322,7 @@ func (p MicroPool) Name() string {
 
 // Pool is an ordered list of posts.
 type Pool struct {
-	Version      string      `json:"version"`
+	Version      Version     `json:"version"`
 	ID           int64       `json:"id"`
 	Names        []string    `json:"names"`
 	Category     string      `json:"category"`
@@ -321,7 +352,7 @@ func (p Pool) PostIDs() []int64 {
 
 // Comment is a comment under a post.
 type Comment struct {
-	Version      string     `json:"version"`
+	Version      Version    `json:"version"`
 	ID           int64      `json:"id"`
 	PostID       int64      `json:"postId"`
 	User         *MicroUser `json:"user"`

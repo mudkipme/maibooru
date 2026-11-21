@@ -263,6 +263,9 @@ func (a *App) libraryBar(c *ui.Context, f *feed) {
 
 		typ := 0
 		cur := oxibooru.TokenValue(q, "type")
+		if cur == "flash" {
+			cur = "flash,document"
+		}
 		for i, tf := range typeFilters {
 			if tf.value == cur {
 				typ = i
@@ -273,7 +276,11 @@ func (a *App) libraryBar(c *ui.Context, f *feed) {
 			labels[i] = tf.label
 		}
 		if ui.Segmented(c.Key("type"), &typ, labels...).Label("Type").Changed() {
-			a.router.Replace(postsURL(oxibooru.SetToken(q, "type", typeFilters[typ].value)))
+			value := typeFilters[typ].value
+			if value == "flash,document" && a.sess.info.Config.Szurubooru() {
+				value = "flash" // Szurubooru keeps no documents
+			}
+			a.router.Replace(postsURL(oxibooru.SetToken(q, "type", value)))
 		}
 
 		if a.sess.safetyEnabled() {
@@ -330,7 +337,7 @@ func (a *App) safetyFilter(c *ui.Context, q string) {
 			on[s] = true
 		}
 	} else {
-		for _, s := range strings.Split(cur, ",") {
+		for s := range strings.SplitSeq(cur, ",") {
 			on[oxibooru.Safety(s)] = true
 		}
 	}

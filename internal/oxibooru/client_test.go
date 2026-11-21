@@ -166,6 +166,9 @@ func TestPrivileges(t *testing.T) {
 }
 
 func TestSzurubooruPrivileges(t *testing.T) {
+	if (&Config{Privileges: map[string]Rank{"post_list": Anonymous}}).Szurubooru() {
+		t.Error("Oxibooru taken for Szurubooru")
+	}
 	cfg := &Config{Privileges: map[string]Rank{
 		"posts:edit:tags":         Regular,
 		"posts:create:anonymous":  Power,
@@ -185,6 +188,9 @@ func TestSzurubooruPrivileges(t *testing.T) {
 		{Regular, "user_edit_self_pass", true},
 		{Restricted, "user_token_create_self", false},
 	} {
+		if !cfg.Szurubooru() {
+			t.Fatal("Szurubooru not told apart")
+		}
 		if got := cfg.Can(tc.rank, tc.priv); got != tc.want {
 			t.Errorf("Can(%s, %s) = %v", tc.rank, tc.priv, got)
 		}
@@ -218,5 +224,28 @@ func TestQueryTokens(t *testing.T) {
 	}
 	if got := Escape("-x*"); got != `\-x\*` {
 		t.Errorf("Escape %q", got)
+	}
+}
+
+func TestVersionsOfBothServers(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{`{"id":1,"version":"2024-09-14T19:06:56.979184564Z"}`, `"2024-09-14T19:06:56.979184564Z"`}, // Oxibooru
+		{`{"id":1,"version":7}`, `7`}, // Szurubooru
+	} {
+		var p Post
+		if err := json.Unmarshal([]byte(tc.in), &p); err != nil {
+			t.Fatal(err)
+		}
+		b, err := json.Marshal(PostFields{Version: p.Version})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := `{"version":` + tc.want + `}`; string(b) != want {
+			t.Errorf("sent back %s, want %s", b, want)
+		}
+	}
+	conflict := &Error{Status: http.StatusConflict, Name: "IntegrityError"}
+	if !errors.Is(conflict, ErrConflict) {
+		t.Error("Szurubooru's IntegrityError is no conflict")
 	}
 }

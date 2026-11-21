@@ -202,7 +202,8 @@ var ErrConflict = errors.New("the resource was changed by someone else")
 
 // Is reports outdated versions as ErrConflict.
 func (e *Error) Is(target error) bool {
-	return target == ErrConflict && e.Status == http.StatusConflict && e.Name == "ResourceModified"
+	// Oxibooru names it ResourceModified, Szurubooru IntegrityError.
+	return target == ErrConflict && e.Status == http.StatusConflict && (e.Name == "ResourceModified" || e.Name == "IntegrityError")
 }
 
 // StatusOf returns the HTTP status of a server's error, 0 for other errors.
@@ -297,5 +298,5 @@ func fieldsQuery(fields []string) url.Values {
 
 // versioned is the body of a deletion.
 type versioned struct {
-	Version string `json:"version"`
+	Version Version `json:"version"`
 }

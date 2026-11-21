@@ -2,6 +2,7 @@ package oxibooru
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -80,7 +81,8 @@ func TestLiveServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if post.CanvasWidth != 64 || len(post.Tags) != 2 || post.Description != "hello" {
+	szuru := ep.Info.Config.Szurubooru()
+	if post.CanvasWidth != 64 || len(post.Tags) != 2 || !szuru && post.Description != "hello" {
 		t.Errorf("post %+v", post)
 	}
 
@@ -100,7 +102,11 @@ func TestLiveServer(t *testing.T) {
 	if len(post.Tags) != 3 {
 		t.Errorf("tags after update %v", post.TagNames())
 	}
-	if _, err := c.UpdatePost(ctx, post.ID, PostFields{Version: "2001-01-01T00:00:00Z", Tags: &tags}); StatusOf(err) != 409 {
+	stale := Version("2001-01-01T00:00:00Z")
+	if szuru {
+		stale = "0"
+	}
+	if _, err := c.UpdatePost(ctx, post.ID, PostFields{Version: stale, Tags: &tags}); !errors.Is(err, ErrConflict) {
 		t.Errorf("outdated update: %v", err)
 	}
 	if post, err = c.SetFavorite(ctx, post.ID, true); err != nil || !post.OwnFavorite {

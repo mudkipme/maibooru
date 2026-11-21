@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -94,7 +95,7 @@ func (a *App) addToPool(name string, posts []int64) {
 		pool := page.Results[0]
 		ids := pool.PostIDs()
 		for _, id := range posts {
-			if !containsID(ids, id) {
+			if !slices.Contains(ids, id) {
 				ids = append(ids, id)
 			}
 		}
@@ -137,15 +138,6 @@ func (a *App) poolChanged(pool *oxibooru.Pool) {
 	if a.viewer.post() != nil {
 		a.viewer.reload(a)
 	}
-}
-
-func containsID(ids []int64, id int64) bool {
-	for _, x := range ids {
-		if x == id {
-			return true
-		}
-	}
-	return false
 }
 
 type notFound string

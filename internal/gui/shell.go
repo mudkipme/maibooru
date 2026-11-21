@@ -125,8 +125,8 @@ func (a *App) contextTags() []string {
 // contextPool returns the pool uploads go into from the page shown, 0 for
 // none.
 func (a *App) contextPool() int64 {
-	if strings.HasPrefix(a.router.Path(), "/pool/") {
-		id, _ := strconv.ParseInt(strings.TrimPrefix(a.router.Path(), "/pool/"), 10, 64)
+	if after, ok := strings.CutPrefix(a.router.Path(), "/pool/"); ok {
+		id, _ := strconv.ParseInt(after, 10, 64)
 		return id
 	}
 	if a.router.Path() == "/posts" {
@@ -166,7 +166,7 @@ func (a *App) received(d transfer.Data) {
 	}
 	if text, err := d.Read(transfer.Text); err == nil {
 		var web []string
-		for _, f := range strings.Fields(string(text)) {
+		for f := range strings.FieldsSeq(string(text)) {
 			if strings.HasPrefix(f, "http://") || strings.HasPrefix(f, "https://") {
 				web = append(web, f)
 			}

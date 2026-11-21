@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strconv"
@@ -408,7 +409,7 @@ func (a *App) postEditor(c *ui.Context, in *inspector, f *feed, p *oxibooru.Post
 	section(c, "Source", func() {
 		ui.TextArea(c.Key("source"), &d.source).Placeholder("Where it comes from, a link a line").Label("Source").Lines(1, 6).
 			ReadOnly(!s.can("post_edit_source"))
-		for _, line := range strings.Split(d.source, "\n") {
+		for line := range strings.SplitSeq(d.source, "\n") {
 			line = strings.TrimSpace(line)
 			if u, err := url.Parse(line); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
 				ui.Link(c.Key("src:"+line), u.Host+u.Path, line).SingleLine().FontSize(12)
@@ -416,10 +417,12 @@ func (a *App) postEditor(c *ui.Context, in *inspector, f *feed, p *oxibooru.Post
 		}
 	})
 
-	section(c, "Description", func() {
-		ui.TextArea(c.Key("desc"), &d.description).Placeholder("Markdown").Label("Description").Lines(2, 12).
-			ReadOnly(!s.can("post_edit_description"))
-	})
+	if !s.info.Config.Szurubooru() {
+		section(c, "Description", func() {
+			ui.TextArea(c.Key("desc"), &d.description).Placeholder("Markdown").Label("Description").Lines(2, 12).
+				ReadOnly(!s.can("post_edit_description"))
+		})
+	}
 
 	if p.Type == oxibooru.TypeVideo || p.Type == oxibooru.TypeAnimation {
 		section(c, "Flags", func() {
@@ -612,9 +615,7 @@ func (a *App) tagCategoriesOf(tags []string) map[string]string {
 			out[n] = cat
 		}
 	}
-	for n, cat := range out {
-		a.knownTags[n] = cat
-	}
+	maps.Copy(a.knownTags, out)
 	return out
 }
 
