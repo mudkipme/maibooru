@@ -139,7 +139,7 @@ func (v *viewer) show(a *App, id int64, q string) {
 	// Keep the library on the post, for going back to it.
 	if f := a.feedOf(q); f != nil {
 		if i := f.index(id); i >= 0 {
-			f.cursor = i
+			f.cursor, f.anchor = i, i
 			f.chosen.Clear()
 			f.chosen.Add(id)
 			f.grid.ScrollIntoView(i)

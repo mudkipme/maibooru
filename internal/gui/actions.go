@@ -217,33 +217,41 @@ func (a *App) openURL(u string) {
 	}()
 }
 
-// dragData is what dragging posts out of the app gives other apps: their
-// files where they are downloaded, else the addresses of their content.
+// dragOut lets el drag posts into other apps, as files.
+func (a *App) dragOut(el ui.Element, posts func() []*oxibooru.Post) {
+	el.DragDataFrom(func() transfer.Data {
+		a.draggingOut = true
+		return a.dragData(posts())
+	}, transfer.DragOptions{Done: func(transfer.Result) { a.draggingOut = false }})
+}
+
+// dragData offers the files of posts, downloading those not kept yet as
+// the drag goes: the app they're dropped on waits for them.
 func (a *App) dragData(posts []*oxibooru.Post) transfer.Data {
-	site := a.sess.client.SiteURL()
-	var files []string
+	s := a.sess
+	items := make([]transfer.Item, 0, len(posts))
 	for _, p := range posts {
-		if path, ok := a.opts.Cache.Cached(site, p); ok {
-			files = append(files, path)
-		}
-	}
-	if len(files) == len(posts) && len(files) > 0 {
-		if d, err := transfer.FileData(files...); err == nil {
-			return d
-		}
-	}
-	for _, p := range posts {
-		go a.opts.Cache.Fetch(a.sess.ctx, a.sess.client, p, nil)
-	}
-	if len(posts) == 1 {
-		if d, err := transfer.URLData(a.sess.client.DataURL(posts[0].ContentURL)); err == nil {
-			return d
-		}
-	}
-	var items []transfer.Item
-	for _, p := range posts {
-		u := a.sess.client.DataURL(p.ContentURL)
-		items = append(items, transfer.NewItem(transfer.Bytes(transfer.URIList, []byte(u)), transfer.Bytes(transfer.Text, []byte(u))))
+		post := *p
+		var (
+			path string
+			err  error
+			done = make(chan struct{})
+		)
+		go func() {
+			defer close(done)
+			path, err = a.opts.Cache.Fetch(s.ctx, s.client, &post, nil)
+		}()
+		items = append(items, transfer.NewItem(transfer.Lazy(transfer.FileList, func() ([]byte, error) {
+			<-done
+			if err != nil {
+				return nil, err
+			}
+			d, err := transfer.FileData(path)
+			if err != nil {
+				return nil, err
+			}
+			return d.Read(transfer.FileList)
+		})))
 	}
 	return transfer.New(items...)
 }

@@ -46,12 +46,17 @@ func (a *App) mainView(c *ui.Context) {
 		a.resizer(c, handle, &a.s.SidebarWidth, 1, 170, 360)
 
 		main := ui.Column(c).Grow(1).MinWidth(0)
-		offer, dragging := ui.DataDragOver(main, dropFormats)
-		dropping := (dragging && a.acceptsDrop(offer)) || main.FileDragOver()
-		if drop, ok := ui.DropData(main, dropFormats); ok {
+		// Posts dragged out of the window don't upload again.
+		formats := dropFormats
+		if a.draggingOut {
+			formats = transfer.DropOptions{}
+		}
+		offer, dragging := ui.DataDragOver(main, formats)
+		dropping := (dragging && a.acceptsDrop(offer)) || (main.FileDragOver() && !a.draggingOut)
+		if drop, ok := ui.DropData(main, formats); ok {
 			a.received(drop.Data)
 		}
-		if files := main.DroppedFiles(); files != nil {
+		if files := main.DroppedFiles(); files != nil && !a.draggingOut {
 			a.up.addFiles(files)
 			a.goUploads()
 		}

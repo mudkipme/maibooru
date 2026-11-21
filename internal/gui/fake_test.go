@@ -508,3 +508,73 @@ func TestLockWaitsForThePIN(t *testing.T) {
 		t.Error("Lock locks without a PIN")
 	}
 }
+
+func TestClickingAThumbnailChoosesIt(t *testing.T) {
+	fs := newFakeServer(t, 6)
+	h := signedIn(t, fs)
+	a := h.app
+	a.router.Push("/posts")
+	h.until("the posts", func() bool { _, ok := h.tt.Find("Post 5"); return ok })
+	f := a.feeds[len(a.feeds)-1]
+	click := func(mods ui.Modifiers, label string) {
+		t.Helper()
+		r, ok := h.tt.Find(label)
+		if !ok {
+			t.Fatalf("no %s", label)
+		}
+		h.tt.ClickAtWith(mods, r.X+r.W/2, r.Y+r.H/2)
+		h.tt.Frame()
+	}
+	chosen := func() []int64 { return slices.Sorted(f.chosen.All()) }
+
+	click(0, "Post 3")
+	if p := f.current(); p == nil || p.ID != 3 || !slices.Equal(chosen(), []int64{3}) || a.insp.id != 3 {
+		t.Fatalf("a click chose %v, the inspector shows %d", chosen(), a.insp.id)
+	}
+	click(ui.Cmd, "Post 5")
+	if !slices.Equal(chosen(), []int64{3, 5}) {
+		t.Errorf("Cmd-click chose %v", chosen())
+	}
+	click(ui.Shift, "Post 1")
+	if !slices.Equal(chosen(), []int64{1, 2, 3, 4, 5}) {
+		t.Errorf("Shift-click chose %v", chosen())
+	}
+	click(0, "Post 2")
+	click(0, "Post 2")
+	if a.router.Path() != "/post/2" {
+		t.Errorf("a double click went to %s", a.router.Path())
+	}
+}
+
+func TestDraggingPostsOutGivesTheirFiles(t *testing.T) {
+	fs := newFakeServer(t, 3)
+	h := signedIn(t, fs)
+	a := h.app
+	a.router.Push("/posts")
+	h.until("the posts", func() bool { _, ok := h.tt.Find("Post 2"); return ok })
+
+	r, _ := h.tt.Find("Post 2")
+	h.tt.Press(r.X+r.W/2, r.Y+r.H/2)
+	h.tt.Move(r.X+r.W/2+40, r.Y+r.H/2+40)
+	h.tt.Frame()
+	if !a.draggingOut {
+		t.Fatal("dragging a post doesn't start a drag")
+	}
+	dropped := filepath.Join(t.TempDir(), "post-2.png")
+	os.WriteFile(dropped, fs.thumb, 0o600)
+	h.tt.DropFiles(r.X+r.W/2+40, r.Y+r.H/2+40, dropped)
+	h.tt.Frame()
+	if len(a.up.items) != 0 {
+		t.Errorf("a post dragged onto the window uploads again")
+	}
+
+	f := a.feeds[len(a.feeds)-1]
+	d := a.dragData([]*oxibooru.Post{&f.posts[f.index(2)]})
+	files, err := d.Files()
+	if err != nil || len(files) != 1 || filepath.Base(files[0]) != "post-2.png" {
+		t.Fatalf("dragged %v, %v", files, err)
+	}
+	if _, err := os.Stat(files[0]); err != nil {
+		t.Errorf("the dragged file isn't there: %v", err)
+	}
+}

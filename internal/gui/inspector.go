@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/netimage"
 	"github.com/mudkipme/maibooru/internal/oxibooru"
@@ -322,7 +321,7 @@ func (a *App) previewBox(c *ui.Context, f *feed, p *oxibooru.Post) {
 	if box.Clicked() {
 		a.openPost(f, p.ID)
 	}
-	box.DragDataFrom(func() transfer.Data { return a.dragData([]*oxibooru.Post{p}) })
+	a.dragOut(box, func() []*oxibooru.Post { return []*oxibooru.Post{p} })
 	box.Children(func() {
 		netimage.Image(c, a.sess.client.DataURL(p.ThumbnailURL), netimage.Options{MaxSide: 900, Fit: ui.Contain}).Fill()
 	})

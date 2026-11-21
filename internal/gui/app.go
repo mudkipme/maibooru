@@ -109,6 +109,7 @@ type App struct {
 	savedOpen     bool
 	waiting       []string // files and links opened before the session was ready
 	active        bool     // the window has the keyboard
+	draggingOut   bool     // posts are being dragged out of the window
 	clipboard     string
 	saveAt        time.Time
 	knownTags     map[string]string

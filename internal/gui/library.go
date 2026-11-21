@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/netimage"
 	"github.com/mudkipme/maibooru/internal/oxibooru"
@@ -34,6 +33,8 @@ type feed struct {
 	grid   ui.GridState
 	cursor int
 	chosen ui.Selection[int64]
+	// anchor is the post Shift-click chooses from.
+	anchor int
 }
 
 const keepFeeds = 6
@@ -57,7 +58,7 @@ func (a *App) openFeed(q string) *feed {
 		}
 		return f
 	}
-	f := &feed{query: q, cursor: -1}
+	f := &feed{query: q, cursor: -1, anchor: -1}
 	f.grid.Key = func(i int) any {
 		if i < len(f.posts) {
 			return f.posts[i].ID
@@ -136,6 +137,32 @@ func (f *feed) chosenPosts() []*oxibooru.Post {
 		}
 	}
 	return out
+}
+
+// click chooses post i as a click does in a grid: Cmd adds it or takes it
+// out, Shift chooses the posts from the one clicked before.
+func (f *feed) click(i int, mods ui.Modifiers) {
+	id := f.posts[i].ID
+	switch {
+	case mods&ui.Shift != 0 && f.anchor >= 0 && f.anchor < len(f.posts):
+		f.chosen.Clear()
+		for j := min(f.anchor, i); j <= max(f.anchor, i); j++ {
+			f.chosen.Add(f.posts[j].ID)
+		}
+	case mods&ui.Cmd != 0:
+		if f.chosen.Has(id) {
+			f.chosen.Remove(id)
+		} else {
+			f.chosen.Add(id)
+		}
+		f.anchor = i
+	default:
+		f.chosen.Clear()
+		f.chosen.Add(id)
+		f.anchor = i
+	}
+	f.cursor = i
+	f.grid.Focus()
 }
 
 // current returns the post the cursor is on, nil for none.
@@ -434,6 +461,7 @@ func (a *App) grid(c *ui.Context, f *feed) {
 		a.thumbnail(c, f, i, size)
 	}).Grow(1).Label("Posts")
 	if grid.Changed() {
+		f.anchor = f.cursor
 		a.insp.follow(a, f)
 	}
 	if grid.Submitted() {
@@ -474,7 +502,12 @@ func (a *App) thumbnail(c *ui.Context, f *feed, i int, size float32) {
 		}
 		a.postsMenu(m, f, a.actionPosts(f, p))
 	})
-	cell.DragDataFrom(func() transfer.Data { return a.dragData(a.actionPosts(f, p)) })
+	// The drag source takes the press from the grid's cell, so it chooses
+	// and opens the post as the cell would.
+	a.dragOut(cell, func() []*oxibooru.Post { return a.actionPosts(f, p) })
+	if cell.Clicked() {
+		f.click(i, cell.ClickModifiers())
+	}
 	if cell.DoubleClicked() {
 		a.openPost(f, p.ID)
 	}
