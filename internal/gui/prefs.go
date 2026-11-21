@@ -61,6 +61,10 @@ func (a *App) settingsView(c *ui.Context) {
 				}
 			})
 
+			section(c, "Lock", func() {
+				changed = a.lockSettings(c) || changed
+			})
+
 			section(c, "Library", func() {
 				size := s.ThumbnailSize
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
@@ -148,6 +152,7 @@ func (a *App) settingsView(c *ui.Context) {
 			})
 		})
 	})
+	a.pinSetupView(c)
 	if changed {
 		a.save()
 	}

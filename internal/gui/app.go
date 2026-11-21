@@ -19,6 +19,7 @@ import (
 	"github.com/mudkipme/maibooru/internal/cache"
 	"github.com/mudkipme/maibooru/internal/oxibooru"
 	"github.com/mudkipme/maibooru/internal/settings"
+	"github.com/mudkipme/maibooru/internal/touchid"
 )
 
 // Secrets keeps the users' tokens, as the system's credential store does.
@@ -65,6 +66,9 @@ type Options struct {
 	// MediaPage makes the web page showing the content native UI can't,
 	// nil where the system has no web view.
 	MediaPage func() (MediaPage, error)
+	// TouchID unlocks the app with the owner's fingerprint, nil where the
+	// system has none.
+	TouchID touchid.Authenticator
 }
 
 // App is the state of the window.
@@ -94,6 +98,8 @@ type App struct {
 	prefs      settingsPage
 	help       helpPage
 	home       homePage
+	lock       lockState
+	pinSetup   pinSetup
 
 	searchText    string
 	searchFocus   ui.Handle
@@ -110,6 +116,8 @@ type App struct {
 	saveSearch    saveSearchDialog
 	shortcutsOpen bool
 	searchHelp    bool
+
+	touchIDAvailable bool
 }
 
 // New returns the app, connecting to the server last used.
@@ -126,6 +134,10 @@ func New(o Options) *App {
 	netimage.SetClient(o.HTTP)
 	if p, ok := a.s.Profile(a.s.Active); ok {
 		a.autoResume = p
+	}
+	a.touchIDAvailable = o.TouchID != nil && o.TouchID.Available()
+	if a.s.PINHash != "" {
+		a.lock = lockState{locked: true, touchID: a.s.TouchID && a.touchIDAvailable}
 	}
 	return a
 }
@@ -202,6 +214,12 @@ func (a *App) View(c *ui.Context) {
 	}
 	c.SetMenuPresentation(ui.PopoverMenus)
 	a.active = c.WindowActive()
+	if a.lock.locked {
+		a.flushSave(c)
+		a.resumeLast()
+		a.lockView(c)
+		return
+	}
 	for _, t := range a.pending {
 		c.AddToast(t)
 	}
@@ -211,16 +229,21 @@ func (a *App) View(c *ui.Context) {
 		a.clipboard = ""
 	}
 	a.flushSave(c)
-	if p := a.autoResume; p != nil {
-		a.autoResume = nil
-		a.resume(*p)
-	}
+	a.resumeLast()
 
 	if a.sess == nil || !a.sess.ready {
 		a.connectView(c)
 		return
 	}
 	a.mainView(c)
+}
+
+// resumeLast connects to the server used last, once.
+func (a *App) resumeLast() {
+	if p := a.autoResume; p != nil {
+		a.autoResume = nil
+		a.resume(*p)
+	}
 }
 
 // confirmation is an alert asking before something that can't be undone.

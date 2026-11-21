@@ -22,6 +22,7 @@ import (
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 	"github.com/mudkipme/maibooru/internal/oxibooru"
+	"github.com/mudkipme/maibooru/internal/settings"
 )
 
 // fakeServer is enough of Oxibooru for the app's tests: posts, their
@@ -462,5 +463,48 @@ func TestHelpShowsTheServerAndTheSyntax(t *testing.T) {
 	h.settle(0)
 	if !h.tt.HasText("special:tumbleweed") {
 		t.Errorf("no syntax: %q", h.tt.Texts())
+	}
+}
+
+func TestLockWaitsForThePIN(t *testing.T) {
+	fs := newFakeServer(t, 1)
+	s := &settings.Settings{PINHash: hashPIN("1234")}
+	h := newHarness(t, s)
+	a := h.app
+	if !a.lock.locked {
+		t.Fatal("a PIN doesn't lock the app as it starts")
+	}
+	signIn(t, h, fs)
+	file := filepath.Join(t.TempDir(), "opened.png")
+	os.WriteFile(file, fs.thumb, 0o600)
+	a.Upload(file)
+	h.tt.Frame()
+	if len(a.up.items) != 0 {
+		t.Fatal("files upload while locked")
+	}
+
+	a.lock.pin = "4321"
+	a.tryPIN()
+	if !a.lock.locked || a.lock.err == "" {
+		t.Fatal("a wrong PIN unlocks")
+	}
+	a.lock.pin = "1234"
+	a.tryPIN()
+	if a.lock.locked {
+		t.Fatal("the PIN doesn't unlock")
+	}
+	if a.router.Path() != "/uploads" || len(a.up.items) != 1 {
+		t.Errorf("page %s, %d uploads after unlocking", a.router.Path(), len(a.up.items))
+	}
+
+	a.Lock()
+	if !a.lock.locked {
+		t.Error("Lock doesn't lock")
+	}
+	a.s.PINHash = ""
+	a.unlock()
+	a.Lock()
+	if a.lock.locked {
+		t.Error("Lock locks without a PIN")
 	}
 }

@@ -224,16 +224,25 @@ func (a *App) start(p settings.Profile, creds oxibooru.Credentials) {
 		a.s.Active = p.ID
 		a.save()
 		a.connect = connectPage{}
-		waiting := a.waiting
-		a.waiting = nil
-		for _, w := range waiting {
-			if strings.Contains(w, "://") {
-				a.OpenURL(w)
-			} else {
-				a.Upload(w)
-			}
-		}
+		a.flushWaiting()
 	})
+}
+
+// flushWaiting opens the files and links that waited for the server or
+// the PIN.
+func (a *App) flushWaiting() {
+	if a.sess == nil || !a.sess.ready || a.lock.locked {
+		return
+	}
+	waiting := a.waiting
+	a.waiting = nil
+	for _, w := range waiting {
+		if strings.Contains(w, "://") {
+			a.OpenURL(w)
+		} else {
+			a.Upload(w)
+		}
+	}
 }
 
 // setTagCategories keeps the tag categories in their order.

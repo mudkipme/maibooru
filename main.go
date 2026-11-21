@@ -17,6 +17,7 @@ import (
 	"github.com/mudkipme/maibooru/internal/cache"
 	"github.com/mudkipme/maibooru/internal/gui"
 	"github.com/mudkipme/maibooru/internal/settings"
+	"github.com/mudkipme/maibooru/internal/touchid"
 )
 
 // mediaPageMade, when set, hears of the viewer's web view as it is made,
@@ -64,6 +65,10 @@ func main() {
 		defer mu.Unlock()
 		return win
 	}
+	auth, err := touchid.NewAuthenticator()
+	if err != nil && !errors.Is(err, errors.ErrUnsupported) {
+		slog.Warn("Touch ID", "err", err)
+	}
 	app := gui.New(gui.Options{
 		Store:    store,
 		Settings: prefs,
@@ -72,6 +77,7 @@ func main() {
 		Desktop:  desktop{win: window},
 		Post:     post,
 		Version:  mygo.App.Version(), // mygo.json's, which mygo build links in
+		TouchID:  auth,
 		MediaPage: func() (gui.MediaPage, error) {
 			w := window()
 			if w == nil || !mygo.WebViewAvailable() {
@@ -118,6 +124,8 @@ func main() {
 		upload(paths)
 	})
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { app.Close() })
+	mygo.Power.OnLockScreen(func() { post(app.Lock) })
+	mygo.Power.OnSuspend(func() { post(app.Lock) })
 
 	mygo.App.WhenReady(func() {
 		if runtime.GOOS == "darwin" {

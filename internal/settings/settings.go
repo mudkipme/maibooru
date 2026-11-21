@@ -78,6 +78,12 @@ type Settings struct {
 	DownloadFolder     string `json:"downloadFolder,omitzero"`
 	PageSize           int    `json:"pageSize,omitzero"`
 	ConfirmDeletePosts bool   `json:"confirmDeletePosts,omitzero"`
+
+	// PINHash is the salted hash of the PIN that unlocks the app, empty
+	// when the app doesn't lock.
+	PINHash string `json:"pinHash,omitzero"`
+	// TouchID lets Touch ID unlock the app instead of the PIN.
+	TouchID bool `json:"touchID,omitzero"`
 }
 
 // Defaults fills what is unset with the defaults.

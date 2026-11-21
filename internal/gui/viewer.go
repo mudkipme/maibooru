@@ -55,8 +55,9 @@ type media struct {
 	thumbOnly bool
 	closed    bool
 	// web is the page showing what native UI can't; blank empties it.
-	web   MediaPage
-	blank func()
+	web       MediaPage
+	blank     func()
+	suspended bool
 }
 
 func (m *media) close() {
@@ -69,6 +70,34 @@ func (m *media) close() {
 	}
 	if m.web != nil && m.blank != nil {
 		m.blank()
+	}
+}
+
+// suspend pauses the video and empties the media page while the app is
+// locked.
+func (v *viewer) suspend() {
+	m := v.media
+	if m == nil || m.closed {
+		return
+	}
+	if m.player != nil {
+		m.player.Pause()
+	}
+	if m.web != nil && m.blank != nil {
+		m.blank()
+		m.suspended = true
+	}
+}
+
+// resume loads the media page again once the app is unlocked.
+func (v *viewer) resume(a *App) {
+	m := v.media
+	if m == nil || m.closed || !m.suspended {
+		return
+	}
+	m.suspended = false
+	if p := v.post(); p != nil && a.sess != nil {
+		a.webMedia(m, p)
 	}
 }
 

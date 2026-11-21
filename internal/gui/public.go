@@ -10,8 +10,9 @@ func (a *App) Upload(paths ...string) {
 	if len(paths) == 0 {
 		return
 	}
-	if a.sess == nil || !a.sess.ready {
-		// Opened with the app as it starts: they wait for the server.
+	if a.sess == nil || !a.sess.ready || a.lock.locked {
+		// Opened with the app as it starts or while it's locked: they wait
+		// for the server and the PIN.
 		a.waiting = append(a.waiting, paths...)
 		return
 	}
@@ -22,7 +23,7 @@ func (a *App) Upload(paths ...string) {
 // OpenURL takes a link the system opened the app with: a maibooru:// link
 // to a page of the app, or a web link to upload.
 func (a *App) OpenURL(raw string) {
-	if a.sess == nil || !a.sess.ready {
+	if a.sess == nil || !a.sess.ready || a.lock.locked {
 		a.waiting = append(a.waiting, raw)
 		return
 	}
@@ -38,21 +39,21 @@ func (a *App) OpenURL(raw string) {
 
 // ChooseUploads asks for files to upload.
 func (a *App) ChooseUploads() {
-	if a.sess != nil && a.sess.ready {
+	if a.sess != nil && a.sess.ready && !a.lock.locked {
 		a.chooseUploads()
 	}
 }
 
 // Reload loads the page shown again.
 func (a *App) Reload() {
-	if a.sess != nil && a.sess.ready {
+	if a.sess != nil && a.sess.ready && !a.lock.locked {
 		a.refresh()
 	}
 }
 
 // Go shows a page of the app, as "/tags" or "/settings".
 func (a *App) Go(path string) {
-	if a.sess != nil && a.sess.ready {
+	if a.sess != nil && a.sess.ready && !a.lock.locked {
 		a.router.Push(path)
 	}
 }
