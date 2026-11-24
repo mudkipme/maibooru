@@ -2,7 +2,7 @@
 
 A native desktop app for managing your personal media library on an [Oxibooru](https://github.com/liamw1/oxibooru) or [Szurubooru](https://github.com/rr-/szurubooru) server. Available for macOS, Windows, and Linux.
 
-![Maibooru](screenshot.webp)
+![Maibooru](docs/screenshot.webp)
 
 ## Features
 
