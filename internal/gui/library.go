@@ -240,6 +240,9 @@ func (a *App) libraryView(c *ui.Context, q string) {
 	}
 	ui.Column(c).Fill().Children(func() {
 		a.libraryBar(c, f)
+		if a.s.ShowFilters {
+			a.filterBar(c, f.query)
+		}
 		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
 			ui.Column(c).Grow(1).MinWidth(0).Children(func() { a.grid(c, f) })
 			if !a.s.HideInspector {
@@ -331,6 +334,12 @@ func (a *App) libraryBar(c *ui.Context, f *feed) {
 				}
 			}
 		})
+
+		filters := on(iconButton(c.Key("filters"), iconFilter, "Show or hide filters"), a.s.ShowFilters || filtersActive(q), c)
+		if filters.Clicked() {
+			a.s.ShowFilters = !a.s.ShowFilters
+			a.save()
+		}
 
 		if strings.TrimSpace(q) != "" {
 			if iconButton(c.Key("save"), iconBookmark, "Save this search in the sidebar").Clicked() {

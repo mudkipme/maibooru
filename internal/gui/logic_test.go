@@ -168,3 +168,12 @@ func TestBooruMarkdown(t *testing.T) {
 		t.Errorf("sjis and icon: %q", got)
 	}
 }
+
+func TestFileSizeFilterSuitsTheServer(t *testing.T) {
+	if got := fileSizeOptions(filterEnv{})[1].value; got != "1MB..10MB" {
+		t.Errorf("Oxibooru %q", got)
+	}
+	if got := fileSizeOptions(filterEnv{szuru: true})[1].value; got != "1000000..10000000" {
+		t.Errorf("Szurubooru %q", got)
+	}
+}

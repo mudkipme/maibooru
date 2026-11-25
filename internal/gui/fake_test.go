@@ -578,3 +578,43 @@ func TestDraggingPostsOutGivesTheirFiles(t *testing.T) {
 		t.Errorf("the dragged file isn't there: %v", err)
 	}
 }
+
+func TestFilterBarSetsTokensOfTheSearch(t *testing.T) {
+	fs := newFakeServer(t, 3)
+	h := signedIn(t, fs)
+	a := h.app
+	a.router.Replace(postsURL("cat aspect-ratio:1..2"))
+	h.settle(0)
+	if err := h.tt.Click("Show or hide filters"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	if !h.tt.HasText("Shape 1..2") {
+		t.Error("a shape typed in the search isn't shown")
+	}
+	if err := h.tt.Click("Shape"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	if err := h.tt.ChooseMenuItem("Portrait"); err != nil {
+		t.Fatalf("%v; menu %v", err, h.tt.Menu())
+	}
+	h.settle(0)
+	if q := a.router.Query("q"); q != "cat ar:..0.95" {
+		t.Errorf("query %q", q)
+	}
+	if err := h.tt.Click("Notes"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	h.tt.ChooseMenuItem("Without Notes")
+	h.settle(0)
+	h.shot("filters")
+	if err := h.tt.Click("Clear"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	if q := a.router.Query("q"); q != "cat" {
+		t.Errorf("query %q after clearing", q)
+	}
+}
