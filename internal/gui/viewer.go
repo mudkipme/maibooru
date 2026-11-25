@@ -142,7 +142,7 @@ func (v *viewer) show(a *App, id int64, q string) {
 			f.cursor, f.anchor = i, i
 			f.chosen.Clear()
 			f.chosen.Add(id)
-			f.grid.ScrollIntoView(i)
+			f.scrollIntoView(i)
 		}
 	}
 }

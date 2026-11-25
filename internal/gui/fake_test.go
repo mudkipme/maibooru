@@ -618,3 +618,63 @@ func TestFilterBarSetsTokensOfTheSearch(t *testing.T) {
 		t.Errorf("query %q after clearing", q)
 	}
 }
+
+func TestLayoutsShowThePosts(t *testing.T) {
+	fs := newFakeServer(t, 40)
+	thumb := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	for i := range 64 {
+		v := uint8(150)
+		if i%8 == 0 || i%8 == 7 || i < 8 || i >= 56 {
+			v = 60
+		}
+		thumb.Set(i%8, i/8, color.RGBA{v, v, 200, 255})
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, thumb)
+	fs.thumb = buf.Bytes()
+	for i := range fs.posts {
+		fs.posts[i].FileSize = int64(1000 * (i + 1) * 937)
+		fs.posts[i].CanvasWidth, fs.posts[i].CanvasHeight = []int{400, 300, 200, 600}[i%4], []int{300, 300, 400, 200}[i%4]
+	}
+	h := signedIn(t, fs)
+	a := h.app
+	a.router.Replace(postsURL(""))
+	f := a.openFeed("")
+	h.until("the posts", func() bool { return len(f.posts) == 40 })
+
+	for _, layout := range []string{layoutJustified, layoutMasonry} {
+		a.s.Layout = layout
+		h.settle(100 * time.Millisecond)
+		h.shot("layout-" + layout)
+		if len(f.flow.rects) != 40 {
+			t.Fatalf("%s placed %d posts", layout, len(f.flow.rects))
+		}
+		f.click(0, 0)
+		h.settle(0)
+		h.tt.Key(0, ui.KeyDown)
+		h.settle(0)
+		first, below := f.flow.rects[0], f.flow.rects[f.cursor]
+		if f.cursor <= 0 || below.Y <= first.Y || below.X >= first.X+first.W {
+			t.Errorf("%s: Down went to post %d at %+v from %+v", layout, f.cursor, below, first)
+		}
+		h.tt.Key(ui.Shift, ui.KeyRight)
+		h.settle(0)
+		if f.chosen.Len() != 2 {
+			t.Errorf("%s: Shift+Right chose %d posts", layout, f.chosen.Len())
+		}
+	}
+
+	a.s.Layout = layoutList
+	h.settle(100 * time.Millisecond)
+	h.shot("layout-list")
+	if !h.tt.HasText("#40") || !h.tt.HasText("400 × 300") {
+		t.Error("the list doesn't show the posts' details")
+	}
+	if err := h.tt.Click("Dimensions"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	if q := a.router.Query("q"); q != "sort:area,asc" {
+		t.Errorf("sorting by dimensions searched %q", q)
+	}
+}

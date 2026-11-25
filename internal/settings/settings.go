@@ -60,6 +60,7 @@ type Settings struct {
 	InspectorWidth float32 `json:"inspectorWidth,omitzero"`
 	HideInspector  bool    `json:"hideInspector,omitzero"`
 	ShowFilters    bool    `json:"showFilters,omitzero"`
+	Layout         string  `json:"layout,omitzero"`
 	ShowNotes      bool    `json:"showNotes,omitzero"`
 	BlurUnsafe     bool    `json:"blurUnsafe,omitzero"`
 	AutoplayVideos bool    `json:"autoplayVideos,omitzero"`

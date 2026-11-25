@@ -31,6 +31,9 @@ type feed struct {
 	gen     int
 
 	grid   ui.GridState
+	flow   flowState
+	list   ui.ListState
+	layout string
 	cursor int
 	chosen ui.Selection[int64]
 	// anchor is the post Shift-click chooses from.
@@ -58,7 +61,7 @@ func (a *App) openFeed(q string) *feed {
 		}
 		return f
 	}
-	f := &feed{query: q, cursor: -1, anchor: -1}
+	f := &feed{query: q, cursor: -1, anchor: -1, flow: flowState{reveal: -1}}
 	f.grid.Key = func(i int) any {
 		if i < len(f.posts) {
 			return f.posts[i].ID
@@ -162,7 +165,7 @@ func (f *feed) click(i int, mods ui.Modifiers) {
 		f.anchor = i
 	}
 	f.cursor = i
-	f.grid.Focus()
+	f.focus()
 }
 
 // current returns the post the cursor is on, nil for none.
@@ -235,8 +238,8 @@ func (a *App) libraryView(c *ui.Context, q string) {
 		f.cursor = 0
 		f.chosen.Clear()
 		f.chosen.Add(f.posts[0].ID)
-		f.grid.ScrollTo(0, ui.Start)
-		f.grid.Focus()
+		f.scrollToStart()
+		f.focus()
 	}
 	ui.Column(c).Fill().Children(func() {
 		a.libraryBar(c, f)
@@ -347,10 +350,13 @@ func (a *App) libraryBar(c *ui.Context, f *feed) {
 			}
 		}
 
-		size := a.s.ThumbnailSize
-		if ui.Slider(c.Key("size"), &size, 100, 360).Width(110).Label("Thumbnail size").Tooltip("Thumbnail size").Changed() {
-			a.s.ThumbnailSize = size
-			a.saveLater()
+		a.layoutMenu(c)
+		if a.s.Layout != layoutList {
+			size := a.s.ThumbnailSize
+			if ui.Slider(c.Key("size"), &size, 100, 360).Width(110).Label("Thumbnail size").Tooltip("Thumbnail size").Changed() {
+				a.s.ThumbnailSize = size
+				a.saveLater()
+			}
 		}
 
 		panel := on(iconButton(c.Key("inspector"), iconPanelRight, "Show or hide the inspector (I)"), !a.s.HideInspector, c)
@@ -459,21 +465,33 @@ func (a *App) grid(c *ui.Context, f *feed) {
 		n += min(f.total-len(f.posts), 12)
 		n = max(n, len(f.posts))
 	}
-	grid := ui.GridView(c.Key("grid:"+f.query), &f.grid, n, size, size, func(i int) {
-		if i >= len(f.posts)-24 {
-			f.loadMore(a)
-		}
-		if i >= len(f.posts) {
-			ui.Box(c).Grow(1).Radius(t.Radius).Background(t.Surface)
-			return
-		}
-		a.thumbnail(c, f, i, size)
-	}).Grow(1).Label("Posts")
-	if grid.Changed() {
+	f.layout = a.s.Layout
+	var grid ui.Element
+	var changed, submitted bool
+	switch f.layout {
+	case layoutList:
+		grid, changed, submitted = a.tableView(c, f)
+	case layoutJustified, layoutMasonry:
+		grid, submitted = a.flowView(c, f, n, f.layout)
+	default:
+		f.layout = layoutGrid
+		grid = ui.GridView(c.Key("grid:"+f.query), &f.grid, n, size, size, func(i int) {
+			if i >= len(f.posts)-24 {
+				f.loadMore(a)
+			}
+			if i >= len(f.posts) {
+				ui.Box(c).Grow(1).Radius(t.Radius).Background(t.Surface)
+				return
+			}
+			a.thumbnail(c, f, i, size)
+		}).Grow(1).Label("Posts")
+		changed, submitted = grid.Changed(), grid.Submitted()
+	}
+	if changed {
 		f.anchor = f.cursor
 		a.insp.follow(a, f)
 	}
-	if grid.Submitted() {
+	if submitted {
 		if p := f.current(); p != nil {
 			a.openPost(f, p.ID)
 		}
