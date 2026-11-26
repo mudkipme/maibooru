@@ -25,6 +25,7 @@ type session struct {
 	poolCats []oxibooru.PoolCategory
 	ready    bool
 	err      error
+	counts   map[string]*postCount
 }
 
 // rank returns the rank of the user, anonymous for none.

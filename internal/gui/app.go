@@ -114,7 +114,8 @@ type App struct {
 	saveAt        time.Time
 	knownTags     map[string]string
 	confirmDelete confirmation
-	saveSearch    saveSearchDialog
+	saveSearch    searchEditor
+	sideFocus     ui.Handle
 	shortcutsOpen bool
 	searchHelp    bool
 
@@ -129,7 +130,7 @@ func New(o Options) *App {
 	if o.Post == nil {
 		o.Post = func(fn func()) { fn() }
 	}
-	a := &App{opts: o, s: o.Settings, router: ui.NewRouter("/"), knownTags: map[string]string{}}
+	a := &App{opts: o, s: o.Settings, router: ui.NewRouter("/"), knownTags: map[string]string{}, savedOpen: true}
 	a.router.Transition = ui.TransitionNone
 	a.up.app = a
 	netimage.SetClient(o.HTTP)

@@ -21,8 +21,15 @@ type postFilter struct {
 
 // filterEnv is what the choices of a filter depend on.
 type filterEnv struct {
-	now   time.Time
-	szuru bool
+	now      time.Time
+	szuru    bool
+	safety   bool
+	signedIn bool
+}
+
+func (a *App) filterEnv() filterEnv {
+	s := a.sess
+	return filterEnv{now: time.Now(), szuru: s.info != nil && s.info.Config.Szurubooru(), safety: s.safetyEnabled(), signedIn: s.user != nil}
 }
 
 func fixedOptions(opts ...filterOption) func(filterEnv) []filterOption {
@@ -145,7 +152,7 @@ func filtersActive(q string) bool {
 // query.
 func (a *App) filterBar(c *ui.Context, q string) {
 	t := c.Theme()
-	env := filterEnv{now: time.Now(), szuru: a.sess.info != nil && a.sess.info.Config.Szurubooru()}
+	env := a.filterEnv()
 	ui.Row(c).Padding(4, 12).Gap(4).AlignItems(ui.Center).Wrap().BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
 		for _, pf := range postFilters {
 			v, neg := pf.value(q)

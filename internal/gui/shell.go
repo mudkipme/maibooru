@@ -83,7 +83,7 @@ func (a *App) mainView(c *ui.Context) {
 // dialogs builds the dialogs any page may open.
 func (a *App) dialogs(c *ui.Context) {
 	a.confirmView(c)
-	a.saveSearchView(c)
+	a.searchEditorView(c)
 	a.shortcutsView(c)
 	a.poolPickerView(c)
 	a.mergeView(c)
@@ -465,22 +465,7 @@ func (a *App) sidebar(c *ui.Context) {
 				up.Children(func() { ui.Badge(c, strconv.Itoa(n)) })
 			}
 		})
-		saved := a.s.Saved[s.profile.ID]
-		if len(saved) > 0 {
-			ui.SidebarSection(c, "Saved Searches", &a.savedOpen, func() {
-				for i, ss := range saved {
-					item := ui.SidebarItem(c.Key(i), postsURL(ss.Query), iconBookmark, ss.Name).Tooltip(ss.Query)
-					item.ContextMenu(func(m *ui.Menu) {
-						if m.Item("Rename…").Chosen() {
-							a.saveSearch = saveSearchDialog{open: true, name: ss.Name, query: ss.Query, index: i}
-						}
-						if m.Item("Remove").Danger().Chosen() {
-							a.removeSavedSearch(i)
-						}
-					})
-				}
-			})
-		}
+		a.savedSearches(c, loc, c.Focused(a.sideFocus))
 		ui.SidebarSection(c, "Organize", nil, func() {
 			ui.SidebarItem(c, "/tags", iconTag, "Tags")
 			ui.SidebarItem(c, "/pools", iconLayers, "Pools")
@@ -498,8 +483,12 @@ func (a *App) sidebar(c *ui.Context) {
 			}
 			ui.SidebarItem(c, "/help", iconInfo, "Help")
 		})
-	}).Grow(1).Label("Places")
-	if side.Changed() && chosen != a.router.Location() {
+	}).Grow(1).Label("Places").Bind(&a.sideFocus)
+	switch {
+	case !side.Changed() || chosen == a.router.Location():
+	case chosen == newSearchID:
+		a.editSearch(-1, settings.SavedSearch{})
+	default:
 		a.router.Push(chosen)
 	}
 	a.accountButton(c)
@@ -570,59 +559,6 @@ func avatar(c *ui.Context, name string, pic ui.ImageSource, size float32) ui.Ele
 	return ui.Box(c).Size(size, size).Radius(size / 2).Shrink(0).Center().Background(t.Accent.Alpha(0.2)).Children(func() {
 		ui.Text(c, initial).FontSize(size * 0.45).Bold().TextColor(t.Accent)
 	})
-}
-
-// Saved searches.
-
-type saveSearchDialog struct {
-	open  bool
-	name  string
-	query string
-	index int // the search renamed, -1 for a new one
-}
-
-func (a *App) saveSearchView(c *ui.Context) {
-	d := &a.saveSearch
-	if !d.open {
-		return
-	}
-	ui.Modal(c, &d.open, func() {
-		title := "Save Search"
-		if d.index >= 0 {
-			title = "Rename Search"
-		}
-		ui.Text(c, title).FontSize(16).Bold()
-		ui.Text(c, d.query).TextColor(c.Theme().TextMuted).Wrap().MaxWidth(360)
-		in := ui.TextInput(c, &d.name).Placeholder("Name").Label("Name").AutoFocus().Width(360)
-		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-			if ui.Button(c, "Cancel").Clicked() {
-				d.open = false
-			}
-			ok := strings.TrimSpace(d.name) != ""
-			if (ui.PrimaryButton(c, "Save").Disabled(!ok).Clicked() || in.Submitted()) && ok {
-				id := a.sess.profile.ID
-				ss := settings.SavedSearch{Name: strings.TrimSpace(d.name), Query: d.query}
-				if d.index >= 0 && d.index < len(a.s.Saved[id]) {
-					a.s.Saved[id][d.index] = ss
-				} else {
-					a.s.Saved[id] = append(a.s.Saved[id], ss)
-				}
-				a.savedOpen = true
-				a.save()
-				d.open = false
-			}
-		})
-	})
-}
-
-func (a *App) removeSavedSearch(i int) {
-	id := a.sess.profile.ID
-	saved := a.s.Saved[id]
-	if i < 0 || i >= len(saved) {
-		return
-	}
-	a.s.Saved[id] = append(saved[:i:i], saved[i+1:]...)
-	a.save()
 }
 
 // shortcutsView lists the keyboard's shortcuts.

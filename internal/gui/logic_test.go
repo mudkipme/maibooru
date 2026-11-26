@@ -177,3 +177,49 @@ func TestFileSizeFilterSuitsTheServer(t *testing.T) {
 		t.Errorf("Szurubooru %q", got)
 	}
 }
+
+func TestRulesMakeTheQueryTheyWereReadFrom(t *testing.T) {
+	ox := filterEnv{safety: true, signedIn: true}
+	for _, c := range []struct {
+		env       filterEnv
+		q, want   string
+		syntaxFor int
+	}{
+		{ox, `cat dog -bird re\:zero cat*`, `cat dog re\:zero cat* -bird`, 0},
+		{ox, "tag:cat,dog -tag:a,b", "tag:cat,dog -a -b", 0},
+		{ox, "rating:safe,sketchy -type:video special:fav flag:sound", "safety:safe,sketchy -type:video special:fav flag:sound", 0},
+		{ox, "upload:ada -fav:bob pool:12", "uploader:ada -fav:bob pool:12", 0},
+		{ox, `source:*pixiv* -description:hello\ world -note-text:*a\:b*`, `source:*pixiv* -description:hello\ world -note-text:*a\:b*`, 0},
+		{ox, "score:5.. width:..1920 ar:1.2..1.8 -tag-count:0 id:5 file-size:1MB..10.5MB", "score:5.. width:..1920 ar:1.2..1.8 -tag-count:0 id:5 file-size:1MB..10.5MB", 0},
+		{filterEnv{szuru: true}, "file-size:1000000..10500000", "file-size:1000000..10500000", 0},
+		{ox, "sort:score date:2024-06 edit-date:yesterday..", "date:2024-06 edit-date:yesterday.. sort:score", 0},
+		{ox, `foo:bar -date:2024 note-count:1,2 source:a*b \*x special:fav,liked`, `foo:bar -date:2024 note-count:1,2 source:a*b \*x special:fav,liked`, 6},
+		{filterEnv{}, "safety:safe special:fav", "safety:safe special:fav", 0},
+	} {
+		rules, sort := parseRules(c.q, c.env)
+		if got := buildQuery(rules, sort, c.env); got != c.want {
+			t.Errorf("%q made %q, want %q", c.q, got, c.want)
+		}
+		n := 0
+		for _, r := range rules {
+			if r.field == syntaxField {
+				n++
+			}
+		}
+		if n != c.syntaxFor {
+			t.Errorf("%q left %d tokens as syntax, want %d", c.q, n, c.syntaxFor)
+		}
+	}
+}
+
+func TestRulesSkipWhatIsIncomplete(t *testing.T) {
+	size := newRule(fieldOf("file-size"))
+	size.op, size.a, size.b = "between", "1.5", ""
+	text := newRule(fieldOf("source"))
+	text.a = "a b"
+	num := newRule(fieldOf("score"))
+	num.a = "lots"
+	if got := buildQuery([]*rule{size, text, num, newRule(ruleFields[0])}, "", filterEnv{szuru: true}); got != `file-size:1500000.. source:*a\ b*` {
+		t.Errorf("query %q", got)
+	}
+}

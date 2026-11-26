@@ -33,6 +33,8 @@ type Profile struct {
 type SavedSearch struct {
 	Name  string `json:"name"`
 	Query string `json:"query"`
+	Icon  string `json:"icon,omitzero"`
+	Color string `json:"color,omitzero"`
 }
 
 // Theme is the appearance of the app.

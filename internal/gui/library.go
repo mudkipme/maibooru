@@ -10,6 +10,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/netimage"
 	"github.com/mudkipme/maibooru/internal/oxibooru"
+	"github.com/mudkipme/maibooru/internal/settings"
 )
 
 // gridFields are the fields of posts the library shows and edits in bulk.
@@ -115,6 +116,7 @@ func (f *feed) loadMore(a *App) {
 			}
 		}
 		f.total = page.Total
+		a.noteCount(q, page.Total)
 		f.done = len(page.Results) == 0 || len(f.posts) >= page.Total
 	})
 }
@@ -346,7 +348,7 @@ func (a *App) libraryBar(c *ui.Context, f *feed) {
 
 		if strings.TrimSpace(q) != "" {
 			if iconButton(c.Key("save"), iconBookmark, "Save this search in the sidebar").Clicked() {
-				a.saveSearch = saveSearchDialog{open: true, name: q, query: q, index: -1}
+				a.editSearch(-1, settings.SavedSearch{Name: q, Query: q})
 			}
 		}
 

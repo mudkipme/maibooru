@@ -678,3 +678,84 @@ func TestLayoutsShowThePosts(t *testing.T) {
 		t.Errorf("sorting by dimensions searched %q", q)
 	}
 }
+
+func TestSavedSearchEditorMakesTheQuery(t *testing.T) {
+	fs := newFakeServer(t, 3)
+	h := signedIn(t, fs)
+	a := h.app
+	a.router.Replace(postsURL("cat"))
+	h.settle(0)
+	if err := h.tt.Click("Save this search in the sidebar"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	d := &a.saveSearch
+	if len(d.rules) != 1 || d.rules[0].field.label != "Tag" || !slices.Equal(d.rules[0].values, []string{"cat"}) {
+		t.Fatalf("the editor read %d rules from the search", len(d.rules))
+	}
+	if err := h.tt.Click("Field"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	if err := h.tt.ChooseMenuItem("Type"); err != nil {
+		t.Fatalf("%v; menu %v", err, h.tt.Menu())
+	}
+	h.settle(0)
+	if err := h.tt.Click("Video"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	if err := h.tt.Click("Match"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	h.tt.ChooseMenuItem("Is Not")
+	h.settle(0)
+	if err := h.tt.Click("Add Rule"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	d.rules[1].values = []string{"cat"}
+	d.name = "Stills"
+	if err := h.tt.Click("Icon and color"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	h.tt.Click("Star")
+	h.tt.Click("Green")
+	h.settle(0)
+	h.tt.Key(0, ui.KeyEscape)
+	h.settle(time.Second)
+	h.shot("saved-search-editor")
+	if err := h.tt.Click("Save"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	saved := a.s.Saved[a.sess.profile.ID]
+	want := settings.SavedSearch{Name: "Stills", Query: "-type:video cat", Icon: "star", Color: "green"}
+	if len(saved) != 1 || saved[0] != want {
+		t.Fatalf("saved %+v", saved)
+	}
+	h.until("the count", func() bool { n, ok := a.postCount(want.Query); return ok && n == 3 })
+	h.settle(0)
+	h.shot("saved-search-sidebar")
+
+	if err := h.tt.RightClick("Stills"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	h.tt.ChooseMenuItem("Edit…")
+	h.settle(0)
+	if r := d.rules[0]; !d.open || d.index != 0 || r.field.label != "Type" || r.op != "not" {
+		t.Errorf("editing read the rules %+v", d.rules)
+	}
+	h.tt.Click("Cancel")
+	h.settle(0)
+	if err := h.tt.Click("New Saved Search…"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle(0)
+	if !d.open || d.index != -1 || d.name != "" {
+		t.Error("New Saved Search didn't open an empty editor")
+	}
+}
