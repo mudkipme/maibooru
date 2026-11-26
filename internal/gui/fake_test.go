@@ -37,6 +37,8 @@ type fakeServer struct {
 	thumb   []byte
 	// similar is what reverse searches find.
 	similar []oxibooru.SimilarPost
+	tags    []oxibooru.Tag
+	pools   []oxibooru.Pool
 }
 
 func newFakeServer(t *testing.T, n int) *fakeServer {
@@ -96,6 +98,16 @@ func newFakeServer(t *testing.T, n int) *fakeServer {
 		end := min(len(fs.posts), offset+limit)
 		page := fs.posts[min(offset, end):end]
 		write(w, map[string]any{"total": len(fs.posts), "offset": offset, "limit": limit, "results": page})
+	})
+	mux.HandleFunc("GET /api/tags/", func(w http.ResponseWriter, r *http.Request) {
+		fs.mu.Lock()
+		defer fs.mu.Unlock()
+		write(w, map[string]any{"total": len(fs.tags), "results": fs.tags})
+	})
+	mux.HandleFunc("GET /api/pools/", func(w http.ResponseWriter, r *http.Request) {
+		fs.mu.Lock()
+		defer fs.mu.Unlock()
+		write(w, map[string]any{"total": len(fs.pools), "results": fs.pools})
 	})
 	mux.HandleFunc("GET /api/post/{id}", func(w http.ResponseWriter, r *http.Request) {
 		fs.mu.Lock()
@@ -757,5 +769,64 @@ func TestSavedSearchEditorMakesTheQuery(t *testing.T) {
 	h.settle(0)
 	if !d.open || d.index != -1 || d.name != "" {
 		t.Error("New Saved Search didn't open an empty editor")
+	}
+}
+
+func TestPaletteGoesToWhatItFinds(t *testing.T) {
+	fs := newFakeServer(t, 3)
+	fs.tags = []oxibooru.Tag{
+		{Names: []string{"cat"}, Category: "default", Usages: 50},
+		{Names: []string{"black_cat"}, Category: "default", Usages: 3},
+		{Names: []string{"sky", "blue_sky"}, Category: "default", Usages: 9},
+	}
+	fs.pools = []oxibooru.Pool{{ID: 7, Names: []string{"Summer_Trip"}, Category: "default", PostCount: 12}}
+	h := signedIn(t, fs)
+	a := h.app
+	a.s.Saved[a.sess.profile.ID] = []settings.SavedSearch{{Name: "Best Cats", Query: "cat score:5.."}}
+	find := func(q string) []paletteItem {
+		t.Helper()
+		h.tt.Key(ui.Cmd, ui.KeyJ)
+		h.settle(0)
+		if !a.pal.open {
+			t.Fatal("Ctrl+J didn't open the palette")
+		}
+		h.tt.Type(q)
+		h.tt.Advance(time.Second)
+		h.until("the palette's search", func() bool { return a.pal.asked == q && len(a.pal.tags) > 0 })
+		h.settle(0)
+		var items []paletteItem
+		for _, g := range a.paletteGroups(ui.LightTheme()) {
+			items = append(items, g.items...)
+		}
+		return items
+	}
+
+	items := find("bc")
+	var names []string
+	for _, it := range items {
+		names = append(names, it.name)
+	}
+	if !slices.Equal(names, []string{"Best Cats", "black_cat"}) {
+		t.Fatalf("found %q", names)
+	}
+	h.shot("palette")
+	h.tt.Key(0, ui.KeyDown)
+	h.tt.Key(0, ui.KeyEnter)
+	h.settle(0)
+	if a.pal.open || a.router.Query("q") != "black_cat" {
+		t.Errorf("went to %q", a.router.Location())
+	}
+
+	if items := find("bluesky"); len(items) != 1 || items[0].name != "sky" || items[0].alias != "blue_sky" {
+		t.Errorf("an alias found %+v", items)
+	}
+	h.tt.Key(0, ui.KeyEscape)
+	h.settle(0)
+
+	find("sumtrip")
+	h.tt.Key(0, ui.KeyEnter)
+	h.settle(0)
+	if a.router.Location() != "/pool/7" {
+		t.Errorf("went to %q", a.router.Location())
 	}
 }

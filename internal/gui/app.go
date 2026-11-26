@@ -116,6 +116,7 @@ type App struct {
 	confirmDelete confirmation
 	saveSearch    searchEditor
 	sideFocus     ui.Handle
+	pal           palette
 	shortcutsOpen bool
 	searchHelp    bool
 

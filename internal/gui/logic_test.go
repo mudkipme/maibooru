@@ -223,3 +223,24 @@ func TestRulesSkipWhatIsIncomplete(t *testing.T) {
 		t.Errorf("query %q", got)
 	}
 }
+
+func TestFuzzyMatchRanksWholeNamesAndStartsFirst(t *testing.T) {
+	names := []string{"c_a_t", "scatter", "black_cat", "cat_ears", "cat", "dog"}
+	slices.SortStableFunc(names, func(x, y string) int {
+		sx, _ := fuzzyMatch(x, "cat")
+		sy, _ := fuzzyMatch(y, "cat")
+		return sy - sx
+	})
+	if want := []string{"cat", "cat_ears", "black_cat", "scatter", "c_a_t", "dog"}; !slices.Equal(names, want) {
+		t.Errorf("ranked %q", names)
+	}
+	if s, _ := fuzzyMatch("dog", "cat"); s != 0 {
+		t.Error("dog matched cat")
+	}
+	if _, hits := fuzzyMatch("Best Cats", "bc"); !slices.Equal(hits, []int{0, 5}) {
+		t.Errorf("hit %v", hits)
+	}
+	if _, hits := fuzzyMatch("black_cat", "bc"); !slices.Equal(hits, []int{0, 6}) {
+		t.Errorf("hit %v in black_cat", hits)
+	}
+}

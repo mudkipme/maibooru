@@ -84,6 +84,7 @@ func (a *App) mainView(c *ui.Context) {
 func (a *App) dialogs(c *ui.Context) {
 	a.confirmView(c)
 	a.searchEditorView(c)
+	a.paletteView(c)
 	a.shortcutsView(c)
 	a.poolPickerView(c)
 	a.mergeView(c)
@@ -193,6 +194,9 @@ func (a *App) goUploads() {
 func (a *App) globalShortcuts(c *ui.Context) {
 	if c.Shortcut(ui.Cmd, ui.KeyF) || (a.keys(c) && (c.Shortcut(0, ui.KeySlash) || c.Shortcut(0, ui.KeyQ))) {
 		a.searchFocus.SelectAll()
+	}
+	if c.Shortcut(ui.Cmd, ui.KeyJ) {
+		a.openPalette()
 	}
 	if c.Shortcut(ui.Cmd, ui.KeyU) {
 		a.chooseUploads()
@@ -587,6 +591,7 @@ func (a *App) shortcutsView(c *ui.Context) {
 // shortcutRows are the keys of the app, and what they do.
 var shortcutRows = [][2]string{
 	{"Ctrl+F, / or Q", "Search"},
+	{"Ctrl+J", "Go to a pool, saved search or tag"},
 	{"P", "Choose the first post"},
 	{"Ctrl+U", "Upload files"},
 	{"Ctrl+V", "Upload what the clipboard holds"},
